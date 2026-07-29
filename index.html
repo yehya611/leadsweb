@@ -124,6 +124,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--bg-hover); }
 </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -234,6 +235,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   </div>
 </div>
 
+<!-- Owner Details Modal -->
 <div class="modal-overlay" id="ownerModal">
   <div class="modal-box">
     <div class="modal-head">
@@ -244,6 +246,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   </div>
 </div>
 
+<!-- Pitch Modal -->
 <div class="modal-overlay" id="pitchModal">
   <div class="modal-box">
     <div class="modal-head">
@@ -261,6 +264,8 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 </div>
 
 <script>
+
+// ================== CONFIG ==================
 const map = L.map('map').setView([39.8283, -98.5795], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
@@ -271,6 +276,7 @@ let markers = [];
 let currentLeads = [];
 let currentPitch = '';
 
+// Overpass tags for each business type
 const typeTags = {
   restaurant:   ['amenity=restaurant','amenity=cafe','amenity=fast_food'],
   dentist:      ['healthcare=dentist','amenity=dentist'],
@@ -296,6 +302,7 @@ const industryNames = {
   electrician:'Electrical', roofing:'Roofing', insurance:'Insurance'
 };
 
+// ================== SEARCH ==================
 async function searchLeads() {
   const city = document.getElementById('inCity').value.trim();
   const state = document.getElementById('inState').value;
@@ -310,6 +317,7 @@ async function searchLeads() {
   clearMarkers();
 
   try {
+    // 1. Geocode with Nominatim
     let query = city ? city : '';
     if (state) query += (query ? ', ' : '') + state + ', USA';
     else query += ', USA';
@@ -326,6 +334,7 @@ async function searchLeads() {
 
     map.setView([lat, lon], 11);
 
+    // 2. Build Overpass query
     const radiusM = radiusMi * 1609.34;
     const tags = typeTags[typeKey] || typeTags.restaurant;
     const tagQuery = tags.map(t => {
@@ -342,6 +351,7 @@ async function searchLeads() {
     });
     const opData = await opRes.json();
 
+    // 3. Process results
     const raw = opData.elements || [];
     const seen = new Set();
     currentLeads = [];
@@ -356,6 +366,7 @@ async function searchLeads() {
       const elLon = el.lon || (el.center && el.center.lon);
       if (!elLat || !elLon) return;
 
+      // Generate a "lead score" based on data quality
       let score = 50;
       if (!tags.website && !tags['contact:website']) score += 25;
       if (!tags.phone && !tags['contact:phone']) score += 10;
@@ -395,6 +406,7 @@ async function searchLeads() {
       currentLeads.push(lead);
     });
 
+    // Sort by score desc
     currentLeads.sort((a,b) => b.score - a.score);
 
     renderLeads();
@@ -422,6 +434,7 @@ function generateNotes(tags, score) {
 }
 
 function estimateYears(tags) {
+  // Fake estimate based on OSM data age or just random reasonable number
   const start = tags['start_date'];
   if (start) {
     const y = parseInt(start);
@@ -430,6 +443,7 @@ function estimateYears(tags) {
   return Math.floor(Math.random() * 15) + 3;
 }
 
+// ================== RENDER ==================
 function renderLeads() {
   const grid = document.getElementById('leadsGrid');
   const countEl = document.getElementById('gridCount');
@@ -469,6 +483,7 @@ function renderLeads() {
     `;
   }).join('');
 
+  // Add markers
   currentLeads.forEach((l, i) => {
     const color = l.score >= 85 ? '#22c55e' : (l.score >= 70 ? '#f59e0b' : '#ef4444');
     const marker = L.circleMarker([l.lat, l.lon], {
@@ -504,6 +519,7 @@ function updateStats() {
   document.getElementById('stAvg').textContent = avg;
 }
 
+// ================== MODALS ==================
 function showOwner(idx) {
   const l = currentLeads[idx];
   if (!l) return;
@@ -584,7 +600,7 @@ Best,
         <strong>Owner:</strong> ${escapeHtml(o.name)}<br>
         <strong>Phone:</strong> ${l.phone || 'N/A'}<br>
         <strong>Website:</strong> ${l.website ? 'Has one (upgrade opportunity)' : 'NONE (greenfield opportunity)'}<br>
-        <strong>Lead Score:</strong> <span style="color:${l.score>=85?'var(--success)':(l.score>=70?'var(--warn)':'var(--danger))}">${l.score}/100</span>
+        <strong>Lead Score:</strong> <span style="color:${l.score>=85?'var(--success)':(l.score>=70?'var(--warn)':'var(--danger)')}">${l.score}/100</span>
       </div>
     </div>
   `;
@@ -595,6 +611,7 @@ function openMap(idx) {
   const l = currentLeads[idx];
   if (!l) return;
   map.setView([l.lat, l.lon], 16);
+  // Find and open popup
   markers.forEach(m => {
     const pos = m.getLatLng();
     if (Math.abs(pos.lat - l.lat) < 0.0001 && Math.abs(pos.lng - l.lon) < 0.0001) {
@@ -603,6 +620,7 @@ function openMap(idx) {
   });
 }
 
+// ================== UTILS ==================
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -630,6 +648,7 @@ function escapeHtml(str) {
 }
 function truncate(str, n) { return str && str.length > n ? str.substring(0,n) + '...' : str; }
 
+// Close modals on backdrop click
 ['ownerModal','pitchModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === document.getElementById(id)) closeModal(id);
